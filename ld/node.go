@@ -17,6 +17,7 @@ package ld
 import (
 	"encoding/json"
 	"fmt"
+	jsoncanonicalizer "github.com/piprate/json-gold/ld/internal/jsoncanonicalizer"
 	"math"
 	"regexp"
 	"strconv"
@@ -297,8 +298,23 @@ func objectToRDF(item interface{}, issuer *IdentifierIssuer, graphName string, t
 				if datatype != RDFJSONLiteral {
 					return NewLiteral(value.(string), datatype.(string), ""), triples
 				} else {
-					// TODO: add JSON Canonicalization
-					return NewLiteral("JSON literals not supported", datatype.(string), ""), triples
+					jsonVal, ok := value.(map[string]interface{})
+					if !ok {
+						return NewLiteral("JSON literal is not of map[string]interface{} type ",
+							datatype.(string), ""), triples
+					}
+
+					jsonByte, err := json.Marshal(jsonVal)
+					if err != nil {
+						return NewLiteral("JSON Marshal error " + err.Error(), datatype.(string), ""), triples
+					}
+
+					b, err := jsoncanonicalizer.Transform(jsonByte)
+					if err != nil {
+						return NewLiteral("JSON Canonicalization error " + err.Error(), datatype.(string), ""), triples
+					}
+
+					return NewLiteral(string(b), datatype.(string), ""), triples
 				}
 			}
 		}
